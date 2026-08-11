@@ -149,10 +149,21 @@ function populateLoginSelect(){const sel=document.getElementById('loginSelect');
 async function login(){
   const sel=document.getElementById('loginSelect'),lv=sel?.value,pw=document.getElementById('passwordInput').value.trim();
   if(!lv||!pw)return;
-  try{const r=await api('POST','/api/login',{login:lv,password:pw});if(r.status==='ok'){currentUser=r.user;if(r.token)localStorage.setItem('taskflow_token',r.token);saveLocal('taskflow_user',currentUser);document.getElementById('loginScreen').classList.add('hidden');await loadServerData();updateUIForRole();renderAll();return}}catch(e){}
-  const au=(data.users&&data.users.length>0)?data.users:DEFAULT_ADMIN;const u=au.find(x=>x.login===lv&&x.password===pw);
-  if(u){currentUser=u;saveLocal('taskflow_user',u);document.getElementById('loginScreen').classList.add('hidden');updateUIForRole();renderAll();return}
-  document.getElementById('loginError').style.display='block'
+  try{
+    const r=await api('POST','/api/login',{login:lv,password:pw});
+    if(r.status==='ok'){
+      currentUser=r.user;
+      if(r.token)localStorage.setItem('taskflow_token',r.token);
+      saveLocal('taskflow_user',currentUser);
+      document.getElementById('loginScreen').classList.add('hidden');
+      await loadServerData();
+      updateUIForRole();renderAll();return;
+    }
+  }catch(e){}
+  const au=(data.users&&data.users.length>0)?data.users:DEFAULT_ADMIN;
+  const u=au.find(x=>x.login===lv&&x.password===pw);
+  if(u){currentUser=u;saveLocal('taskflow_user',u);document.getElementById('loginScreen').classList.add('hidden');updateUIForRole();renderAll();return;}
+  document.getElementById('loginError').style.display='block';
 }
 function showChangePassword(){const sel=document.getElementById('loginSelect'),l=sel?.value;if(!l)return;const op=prompt('Старый пароль:');if(!op)return;const au=(data.users&&data.users.length>0)?data.users:DEFAULT_ADMIN;const u=au.find(x=>x.login===l&&x.password===op);if(!u){alert('Неверный пароль');return}const np=prompt('Новый пароль:');if(!np||np.length<3)return;const cp=prompt('Подтвердите:');if(np!==cp)return;u.password=np;saveLocal('taskflow_local_data',data);apiSafe('POST','/api/users/'+u.id,{password:np}).catch(()=>{});alert('Пароль изменён!')}
 function updateUIForRole(){if(!currentUser)return;document.getElementById('sidebarUser').innerHTML=`<div class="avatar">${currentUser.name.charAt(0)}</div><span>${esc(currentUser.name)} — ${getRoleLabel(currentUser.role)}</span>`;renderSidebarFooter()}
@@ -267,16 +278,25 @@ document.addEventListener('keydown',function(e){if(e.code==='Enter'&&e.target.id
 async function init(){
   initTheme();
   const ld=loadLocal('taskflow_local_data');
-  if(ld){data=ld;if(!data.users||data.users.length===0)data.users=[...DEFAULT_ADMIN]}
-  if(!data.unread)data.unread={};if(!data.notifications)data.notifications={};
+  if(ld){data=ld;}
+  if(!data.users||data.users.length===0)data.users=[...DEFAULT_ADMIN];
+  if(!data.unread)data.unread={};
+  if(!data.notifications)data.notifications={};
   archiveTasks=loadLocal('taskflow_archive_local')||[];
-  SERVER_URL=APPS_SCRIPT_URL;localStorage.setItem('taskflow_server',SERVER_URL);
+  SERVER_URL=APPS_SCRIPT_URL;
+  localStorage.setItem('taskflow_server',SERVER_URL);
   updateConnection('searching','Загрузка...');
+  
+  try{
+    const r=await api('GET','/api/data');
+    if(r.users&&r.users.length>0){data=r;saveLocal('taskflow_local_data',data);updateConnection('online','Подключено');}
+  }catch(e){updateConnection('offline','Автономный режим');}
+  
+  if(!data.users||data.users.length===0)data.users=[...DEFAULT_ADMIN];
   populateLoginSelect();
   const su=loadLocal('taskflow_user');
-  if(su){currentUser=(data.users||[]).find(u=>u.id===su.id);if(currentUser){document.getElementById('loginScreen').classList.add('hidden');updateUIForRole();renderAll()}}
-  else{document.getElementById('loginScreen').classList.remove('hidden')}
-  loadServerData().catch(()=>{});
+  if(su){currentUser=(data.users||[]).find(u=>u.id===su.id);if(currentUser){document.getElementById('loginScreen').classList.add('hidden');updateUIForRole();renderAll();return;}}
+  document.getElementById('loginScreen').classList.remove('hidden');
 }
 init();
 </script>
