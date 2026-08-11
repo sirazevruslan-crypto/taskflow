@@ -248,14 +248,53 @@ document.addEventListener('keydown',function(e){if(e.code==='Enter'&&e.target.id
 
 async function init(){
   initTheme();
-  const ld=loadLocal('taskflow_local_data');if(ld){data=ld;if(!data.users||data.users.length===0)data.users=[...DEFAULT_ADMIN];}
-  if(!data.unread)data.unread={};if(!data.notifications)data.notifications={};
-  archiveTasks=loadLocal('taskflow_archive_local')||[];
-  SERVER_URL=APPS_SCRIPT_URL;localStorage.setItem('taskflow_server',SERVER_URL);
-  try{const r=await api('GET','/api/ping');if(r.status==='alive'){updateConnection('online','Подключено к Google');await loadServerData();}}catch(e){console.log('Сервер недоступен:',e);updateConnection('offline','Автономный режим');}
-  if(!data.users||data.users.length===0){data.users=[...DEFAULT_ADMIN];}
+  
+  // Загружаем данные из localStorage (если есть)
+  const ld = loadLocal('taskflow_local_data');
+  if (ld) { data = ld; if (!data.users || data.users.length === 0) data.users = [...DEFAULT_ADMIN]; }
+  if (!data.unread) data.unread = {};
+  if (!data.notifications) data.notifications = {};
+  archiveTasks = loadLocal('taskflow_archive_local') || [];
+  
+  SERVER_URL = APPS_SCRIPT_URL;
+  localStorage.setItem('taskflow_server', SERVER_URL);
+  
+  // Пробуем загрузить свежие данные с сервера
+  try {
+    updateConnection('searching', 'Загрузка данных...');
+    const r = await api('GET', '/api/data');
+    if (r.users && r.users.length > 0) {
+      data = r;
+      archiveLoaded = false;
+      archiveTasks = [];
+      saveLocal('taskflow_local_data', data);
+      lastSyncTime = Date.now();
+      updateConnection('online', 'Подключено к Google');
+    }
+  } catch(e) {
+    console.log('Сервер недоступен:', e);
+    updateConnection('offline', 'Автономный режим');
+  }
+  
+  // Гарантированно есть хоть один пользователь
+  if (!data.users || data.users.length === 0) {
+    data.users = [...DEFAULT_ADMIN];
+  }
+  
+  // ★ ВАЖНО: заполняем выпадающий список ДО проверки входа
   populateLoginSelect();
-  const su=loadLocal('taskflow_user');if(su){currentUser=(data.users||[]).find(u=>u.id===su.id);if(currentUser){document.getElementById('loginScreen').classList.add('hidden');updateUIForRole();renderAll();return;}}
+  
+  // Проверяем, был ли выполнен вход ранее
+  const su = loadLocal('taskflow_user');
+  if (su) {
+    currentUser = (data.users || []).find(u => u.id === su.id);
+    if (currentUser) {
+      document.getElementById('loginScreen').classList.add('hidden');
+      updateUIForRole();
+      renderAll();
+      return;
+    }
+  }
   document.getElementById('loginScreen').classList.remove('hidden');
 }
 init();
