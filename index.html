@@ -293,7 +293,7 @@ async function init(){
   const su=loadLocal('taskflow_user');if(su){currentUser=(data.users||[]).find(u=>u.id===su.id);if(currentUser){document.getElementById('loginScreen').classList.add('hidden');updateUIForRole();renderAll();return;}}
   document.getElementById('loginScreen').classList.remove('hidden');
 }
-(async () => { await init(); })();
+init();
 </script>
 </body>
 </html>
