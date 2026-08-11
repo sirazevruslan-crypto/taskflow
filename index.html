@@ -182,7 +182,46 @@ async function archiveCurrentTask(){if(!editingTaskId)return;await apiSafe('POST
 async function restoreCurrentTask(){if(!editingTaskId)return;await apiSafe('POST','/api/tasks/'+editingTaskId,{status:'new'});let t=archiveTasks.find(x=>x.id===editingTaskId);if(t){archiveTasks=archiveTasks.filter(x=>x.id!==editingTaskId);t.status='new';data.tasks.push(t)}closeModal();renderAll()}
 async function addTask(st){if(!selectedProjectId)return;const t={id:'t'+Date.now(),title:'Новая задача',description:'',dueDate:'',priority:'medium',status:st||'new',assigneeId:currentUser.id,createdBy:currentUser.id,delegatedTo:null,projectId:selectedProjectId,checklists:[],files:[],comment:''};try{const r=await apiSafe('PUT','/api/tasks',t);if(r&&r.task)t.id=r.task.id}catch(e){}data.tasks=data.tasks||[];data.tasks.push(t);saveLocal('taskflow_local_data',data);openTask(t.id)}
 function openTask(tid){let t=(data.tasks||[]).find(x=>x.id===tid);let ia=false;if(!t){t=archiveTasks.find(x=>x.id===tid);ia=true}if(!t)return;editingTaskId=tid;const ar=t.status==='archived';document.getElementById('modalTitle').value=t.title||'';document.getElementById('modalDesc').value=t.description||'';document.getElementById('modalDue').value=t.dueDate||'';document.getElementById('modalPriority').value=t.priority||'medium';document.getElementById('modalStatus').value=t.status||'new';document.getElementById('modalComment').value=t.comment||'';const cr2=(data.users||[]).find(u=>u.id===t.createdBy);document.getElementById('modalAuthor').value=cr2?cr2.name:'Неизвестно';['modalDesc','modalDue','modalPriority','modalStatus','modalAssignee','modalComment'].forEach(id=>document.getElementById(id).toggleAttribute('disabled',ar));document.getElementById('modalTitle').readOnly=ar;document.getElementById('btnArchive').style.display=ar?'none':'inline-flex';document.getElementById('btnRestore').style.display=ar?'inline-flex':'none';document.querySelector('#modalFooter .btn-save').style.display=ar?'none':'inline-flex';document.querySelector('#modalFooter .btn-delete').style.display=ar?'none':'inline-flex';const sel=document.getElementById('modalAssignee');sel.innerHTML=getSubordinateUsers().map(u=>`<option value="${u.id}" ${t.assigneeId===u.id?'selected':''}>${esc(u.name)}</option>`).join('');if(ar)sel.setAttribute('disabled','');const df=document.getElementById('delegateField'),ds=document.getElementById('modalDelegate');const a=(data.users||[]).find(u=>u.id===t.assigneeId);if(a&&a.role==='manager'&&!ar){df.style.display='block';const subs=(data.users||[]).filter(u=>u.deptId===a.deptId&&u.role==='executor');ds.innerHTML='<option value="">— Не делегировано —</option>'+subs.map(u=>`<option value="${u.id}" ${t.delegatedTo===u.id?'selected':''}>${esc(u.name)}</option>`).join('')}else{df.style.display='none';ds.innerHTML='<option value="">— Не делегировано —</option>'}renderChecklists(t);renderFiles(t);document.getElementById('modalOverlay').classList.add('open');setTimeout(()=>document.getElementById('modalTitle').focus(),100)}
-async function saveTask(){if(!editingTaskId)return;let t=(data.tasks||[]).find(x=>x.id===editingTaskId);let ia=false;if(!t){t=archiveTasks.find(x=>x.id===editingTaskId);ia=true}if(!t)return;const u={title:document.getElementById('modalTitle').value||'Без названия',description:document.getElementById('modalDesc').value,dueDate:document.getElementById('modalDue').value,priority:document.getElementById('modalPriority').value,status:document.getElementById('modalStatus').value,assigneeId:document.getElementById('modalAssignee').value,delegatedTo:document.getElementById('modalDelegate')?.value||null,comment:document.getElementById('modalComment').value,checklists:[],files:t.files||[]};document.querySelectorAll('#checklistItems .checklist-item').forEach(r=>{const tx=r.querySelector('input[type="text"]')?.value,cb=r.querySelector('input[type="checkbox"]')?.checked;if(tx)u.checklists.push({text:tx,done:cb})});Object.assign(t,u);try{await apiSafe('POST','/api/tasks/'+editingTaskId,u)}catch(e){}if(u.status==='archived'&&!ia){data.tasks=(data.tasks||[]).filter(x=>x.id!==editingTaskId);archiveTasks.push(t)}else if(u.status!=='archived'&&ia){archiveTasks=archiveTasks.filter(x=>x.id!==editingTaskId);data.tasks.push(t)}saveLocal('taskflow_local_data',data);saveLocal('taskflow_archive_local',archiveTasks);closeModal();renderAll()}
+async function saveTask(){
+  if(!editingTaskId)return;
+  let t=(data.tasks||[]).find(x=>x.id===editingTaskId);
+  let ia=false;
+  if(!t){
+    if(Array.isArray(archiveTasks)){
+      t=archiveTasks.find(x=>x.id===editingTaskId);
+      ia=true;
+    }
+  }
+  if(!t)return;
+  const u={
+    title:document.getElementById('modalTitle').value||'Без названия',
+    description:document.getElementById('modalDesc').value,
+    dueDate:document.getElementById('modalDue').value,
+    priority:document.getElementById('modalPriority').value,
+    status:document.getElementById('modalStatus').value,
+    assigneeId:document.getElementById('modalAssignee').value,
+    delegatedTo:document.getElementById('modalDelegate')?.value||null,
+    comment:document.getElementById('modalComment').value,
+    checklists:[],
+    files:t.files||[]
+  };
+  document.querySelectorAll('#checklistItems .checklist-item').forEach(r=>{
+    const tx=r.querySelector('input[type="text"]')?.value,cb=r.querySelector('input[type="checkbox"]')?.checked;
+    if(tx)u.checklists.push({text:tx,done:cb});
+  });
+  Object.assign(t,u);
+  try{await apiSafe('POST','/api/tasks/'+editingTaskId,u)}catch(e){}
+  if(u.status==='archived'&&!ia){
+    data.tasks=(data.tasks||[]).filter(x=>x.id!==editingTaskId);
+    if(Array.isArray(archiveTasks))archiveTasks.push(t);
+  }else if(u.status!=='archived'&&ia){
+    if(Array.isArray(archiveTasks))archiveTasks=archiveTasks.filter(x=>x.id!==editingTaskId);
+    data.tasks=(data.tasks||[]);data.tasks.push(t);
+  }
+  saveLocal('taskflow_local_data',data);
+  saveLocal('taskflow_archive_local',Array.isArray(archiveTasks)?archiveTasks:[]);
+  closeModal();renderAll();
+}
 async function deleteCurrentTask(){if(!editingTaskId||!confirm('Удалить задачу?'))return;data.tasks=(data.tasks||[]).filter(t=>t.id!==editingTaskId);archiveTasks=archiveTasks.filter(t=>t.id!==editingTaskId);saveLocal('taskflow_local_data',data);saveLocal('taskflow_archive_local',archiveTasks);try{await apiSafe('DELETE','/api/tasks/'+editingTaskId)}catch(e){}closeModal();renderAll()}
 function closeModal(){document.getElementById('modalOverlay').classList.remove('open');editingTaskId=null}
 function closeModalOutside(e){if(e.target===document.getElementById('modalOverlay'))closeModal()}
