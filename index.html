@@ -128,6 +128,8 @@ async function apiSafe(m,p,b=null){try{return await api(m,p,b)}catch(e){throw e}
 
 function updateConnection(s,m){connectionStatus=s;const b=document.getElementById('connectionBar');if(!b)return;b.className='connection-bar '+s;b.innerHTML=({online:'🟢',offline:'🔴',searching:'🟡',syncing:'🟠'})[s]+' '+m}
 
+function showServerDialog(){alert('Сервер: '+SERVER_URL)}
+  
 async function loadServerData(){
   try{
     updateConnection('syncing','Загрузка...');
